@@ -62,9 +62,9 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpasync-client</artifactId>
-            <version>4.1.4</version> <!-- 兼容 JDK 1.8 的版本 -->
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>3.14.9</version> <!-- 支持 JDK 1.8 的最后一个版本 -->
         </dependency>
     </dependencies>
 
