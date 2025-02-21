@@ -1,3 +1,14 @@
+import com.squareup.okhttp.*;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import javax.servlet.AsyncContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.TimeUnit;
+
 @Service
 public class FileProxyService {
 
@@ -5,18 +16,17 @@ public class FileProxyService {
 
     public FileProxyService() {
         // 配置 OkHttp 客户端（连接池、超时时间）
-        this.okHttpClient = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)    // 连接超时
-                .readTimeout(60, TimeUnit.SECONDS)       // 读取超时
-                .writeTimeout(60, TimeUnit.SECONDS)      // 写入超时
-                .connectionPool(new ConnectionPool(200, 5, TimeUnit.MINUTES)) // 连接池
-                .build();
+        this.okHttpClient = new OkHttpClient();
+        this.okHttpClient.setConnectTimeout(30, TimeUnit.SECONDS);
+        this.okHttpClient.setReadTimeout(60, TimeUnit.SECONDS);
+        this.okHttpClient.setWriteTimeout(60, TimeUnit.SECONDS);
+        this.okHttpClient.setConnectionPool(new ConnectionPool(200, 5, TimeUnit.MINUTES));
     }
 
     @Async
     public void handleAsyncDownload(RequestBody requestBody, AsyncContext asyncContext, HttpServletRequest request, HttpServletResponse response) {
         try {
-            // Step 1: 调用应用 B 获取文件 URL
+            // Step 1: 调用应用 B 获取文件 URL（需实现）
             String fileUrl = fetchFileUrlFromAppB(requestBody);
 
             // Step 2: 代理下载文件
@@ -39,7 +49,7 @@ public class FileProxyService {
         // 异步执行请求
         okHttpClient.newCall(requestBuilder.build()).enqueue(new Callback() {
             @Override
-            public void onResponse(Call call, Response okResponse) {
+            public void onResponse(Response okResponse) throws IOException {
                 try (ResponseBody responseBody = okResponse.body()) {
                     if (!okResponse.isSuccessful()) {
                         throw new IOException("Unexpected code: " + okResponse);
@@ -64,7 +74,7 @@ public class FileProxyService {
             }
 
             @Override
-            public void onFailure(Call call, IOException e) {
+            public void onFailure(Request request, IOException e) {
                 handleError(asyncContext, response, e);
             }
         });
@@ -74,7 +84,7 @@ public class FileProxyService {
         // 复制状态码
         target.setStatus(source.code());
 
-        // 复制关键头信息（如 Content-Type、Content-Length、Content-Range）
+        // 复制关键头信息
         String contentType = source.header("Content-Type");
         if (contentType != null) {
             target.setHeader("Content-Type", contentType);
@@ -90,9 +100,21 @@ public class FileProxyService {
             target.setHeader("Content-Range", contentRange);
         }
 
-        // 支持断点续传
         target.setHeader("Accept-Ranges", "bytes");
     }
 
-    // 其他方法（fetchFileUrlFromAppB、handleError）保持不变
+    private String fetchFileUrlFromAppB(RequestBody requestBody) {
+        // 实现调用应用 B 的逻辑（示例返回固定值）
+        return "http://app-b/files/123";
+    }
+
+    private void handleError(AsyncContext asyncContext, HttpServletResponse response, Exception e) {
+        try {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+        } catch (IOException ex) {
+            // 日志记录
+        } finally {
+            asyncContext.complete();
+        }
+    }
 }
