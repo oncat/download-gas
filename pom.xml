@@ -27,44 +27,26 @@
         <commons-io.version>2.11.0</commons-io.version>
     </properties>
 
+
     <dependencies>
-        <!-- Spring Boot Web 支持 -->
+        <!-- Spring Boot Web 依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Apache 异步 HTTP 客户端 -->
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpasync-client</artifactId>
-            <version>${httpasync.version}</version>
-        </dependency>
-
-        <!-- Apache HTTP 核心库 -->
+        <!-- Apache HttpClient 依赖（排除默认的 RestTemplate 实现）-->
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>${httpclient.version}</version>
+            <version>4.5.13</version>
         </dependency>
 
-        <!-- 流处理工具（可选） -->
+        <!-- 日志依赖（可选）-->
         <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>${commons-io.version}</version>
-        </dependency>
-
-        <!-- 测试依赖 -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>okhttp</artifactId>
-            <version>3.14.9</version> <!-- 支持 JDK 1.8 的最后一个版本 -->
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.30</version>
         </dependency>
     </dependencies>
 
