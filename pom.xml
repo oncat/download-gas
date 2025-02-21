@@ -61,7 +61,13 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpasync-client</artifactId>
+            <version>4.1.4</version> <!-- 兼容 JDK 1.8 的版本 -->
+        </dependency>
     </dependencies>
+
 
     <build>
         <plugins>
