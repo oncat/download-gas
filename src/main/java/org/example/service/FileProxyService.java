@@ -1,4 +1,4 @@
-import com.squareup.okhttp.*;
+import okhttp3.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import javax.servlet.AsyncContext;
@@ -16,11 +16,12 @@ public class FileProxyService {
 
     public FileProxyService() {
         // 配置 OkHttp 客户端（连接池、超时时间）
-        this.okHttpClient = new OkHttpClient();
-        this.okHttpClient.setConnectTimeout(30, TimeUnit.SECONDS);
-        this.okHttpClient.setReadTimeout(60, TimeUnit.SECONDS);
-        this.okHttpClient.setWriteTimeout(60, TimeUnit.SECONDS);
-        this.okHttpClient.setConnectionPool(new ConnectionPool(200, 5, TimeUnit.MINUTES));
+        this.okHttpClient = new OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)    // 连接超时
+                .readTimeout(60, TimeUnit.SECONDS)       // 读取超时
+                .writeTimeout(60, TimeUnit.SECONDS)      // 写入超时
+                .connectionPool(new ConnectionPool(200, 5, TimeUnit.MINUTES)) // 连接池
+                .build();
     }
 
     @Async
@@ -49,7 +50,7 @@ public class FileProxyService {
         // 异步执行请求
         okHttpClient.newCall(requestBuilder.build()).enqueue(new Callback() {
             @Override
-            public void onResponse(Response okResponse) throws IOException {
+            public void onResponse(Call call, Response okResponse) throws IOException {
                 try (ResponseBody responseBody = okResponse.body()) {
                     if (!okResponse.isSuccessful()) {
                         throw new IOException("Unexpected code: " + okResponse);
@@ -74,7 +75,7 @@ public class FileProxyService {
             }
 
             @Override
-            public void onFailure(Request request, IOException e) {
+            public void onFailure(Call call, IOException e) {
                 handleError(asyncContext, response, e);
             }
         });
