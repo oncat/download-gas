@@ -3,12 +3,19 @@ package org.example.controller;
 import lombok.Data;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/files")
@@ -25,7 +32,6 @@ public class FileController {
             @RequestBody DownloadRequest request,
             @RequestHeader(value = "Range", required = false) String rangeHeader) {
 
-        // 配置WebClient使用零内存缓冲模式
         WebClient streamingWebClient = webClient.mutate()
                 .exchangeStrategies(ExchangeStrategies.builder()
                         .codecs(config -> config.defaultCodecs().maxInMemorySize(0))
@@ -40,8 +46,18 @@ public class FileController {
                     }
                 })
                 .retrieve()
+                .onStatus(HttpStatus::isError, response -> {
+                    // 保留原始错误响应
+                    return response.createException()
+                            .flatMap(ex -> Mono.error(new ResponseStatusException(
+                                    response.statusCode(),
+                                    ex.getResponseBodyAsString(),
+                                    ex)));
+                })
                 .toEntityFlux(DataBuffer.class)
+                .timeout(Duration.ofSeconds(30))
                 .map(responseEntity -> {
+                    // 构建透传的响应头
                     HttpHeaders headers = new HttpHeaders();
                     responseEntity.getHeaders().forEach((key, values) -> {
                         if (!isSensitiveHeader(key)) {
@@ -54,27 +70,42 @@ public class FileController {
                         headers.set(HttpHeaders.CONTENT_TYPE, "application/octet-stream");
                     }
 
-                    // 添加容错处理：当客户端断开连接时主动释放资源
+                    // 添加资源清理逻辑
                     Flux<DataBuffer> body = responseEntity.getBody()
-                            .doOnCancel(() -> cleanupResources())
-                            .doOnError(e -> cleanupResources());
+                            .doOnCancel(this::cleanupResources)
+                            .doOnError(e -> this.cleanupResources());
 
-                    return ResponseEntity
-                            .status(responseEntity.getStatusCode())
+                    return ResponseEntity.status(responseEntity.getStatusCode())
                             .headers(headers)
                             .body(body);
-                });
+                })
+                .onErrorResume(this::handleError);
     }
 
-    // 过滤不需要透传的Header
     private boolean isSensitiveHeader(String headerName) {
-        return headerName.equalsIgnoreCase(HttpHeaders.TRANSFER_ENCODING)
-                || headerName.equalsIgnoreCase("X-Server-Info");
+        return headerName.equalsIgnoreCase("X-Server-Info");
     }
 
-    // 资源清理逻辑（如需要）
     private void cleanupResources() {
-        // 可添加日志记录或资源释放操作
+        // 示例资源清理逻辑
+        System.out.println("Cleaning up resources...");
+    }
+
+    private Mono<ResponseEntity<Flux<DataBuffer>>> handleError(Throwable ex) {
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        if (ex instanceof ConnectException) {
+            status = HttpStatus.BAD_GATEWAY;
+        } else if (ex instanceof SocketTimeoutException) {
+            status = HttpStatus.GATEWAY_TIMEOUT;
+        } else if (ex instanceof WebClientResponseException) {
+            // 透传原始错误状态码
+            return Mono.just(ResponseEntity
+                    .status(((WebClientResponseException) ex).getStatusCode())
+                    .body(Flux.empty()));
+        }
+        return Mono.just(ResponseEntity
+                .status(status)
+                .body(Flux.empty()));
     }
 
     @Data
